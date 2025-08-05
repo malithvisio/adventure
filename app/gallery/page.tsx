@@ -4,7 +4,9 @@ import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Layout from '@/components/layout/Layout';
 import Link from 'next/link';
-import { ImageGallery } from 'react-image-grid-gallery';
+import { RowsPhotoAlbum, Photo } from 'react-photo-album';
+import 'react-photo-album/rows.css';
+import { getCurrentRootUserId } from '@/util/root-user-config';
 
 interface GalleryImage {
   _id?: string;
@@ -36,7 +38,10 @@ export default function GalleryPage() {
     const fetchGalleries = async () => {
       try {
         setLoading(true);
-        const response = await fetch('/api/gallery/public');
+        const rootUserId = getCurrentRootUserId();
+        const response = await fetch(
+          `/api/gallery/public?rootUserId=${rootUserId}`
+        );
         const data = await response.json();
 
         if (data.success) {
@@ -67,14 +72,22 @@ export default function GalleryPage() {
     return galleries.find(gallery => gallery._id === selectedGallery);
   };
 
-  const getImagesForGallery = (gallery: Gallery) => {
+  const getPhotosForGallery = (gallery: Gallery) => {
     return gallery.images
       .sort((a, b) => a.order - b.order)
       .map((image, index) => ({
-        id: image._id || `image-${index}`,
-        alt: image.alt || image.topic,
-        caption: image.topic,
         src: image.url,
+        width: 800, // Default width - you can adjust based on your needs
+        height: 600, // Default height - you can adjust based on your needs
+        alt: image.alt || image.topic,
+        title: image.topic,
+        // Add custom data attribute for CSS overlay
+        'data-title': image.topic,
+        // You can add srcSet for responsive images if you have multiple resolutions
+        // srcSet: [
+        //   { src: image.url.replace('.jpg', '_400x300.jpg'), width: 400, height: 300 },
+        //   { src: image.url.replace('.jpg', '_200x150.jpg'), width: 200, height: 150 },
+        // ],
       }));
   };
 
@@ -173,6 +186,74 @@ export default function GalleryPage() {
 
   return (
     <Layout headerStyle={1} footerStyle={2}>
+      <style jsx>{`
+        /* Custom styling for photo album images */
+        .react-photo-album--row > div {
+          position: relative;
+          border-radius: 8px;
+          overflow: hidden;
+        }
+
+        .react-photo-album--row img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          transition: transform 0.3s ease;
+        }
+
+        .react-photo-album--row > div:hover img {
+          transform: scale(1.05);
+        }
+
+        /* Add overlay to each image with proper positioning - hidden by default */
+        .react-photo-album--row > div::before {
+          content: '';
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          height: 60px;
+          background: linear-gradient(
+            transparent,
+            rgba(0, 0, 0, 0.7) 30%,
+            rgba(0, 0, 0, 0.9)
+          );
+          z-index: 5;
+          pointer-events: none;
+          opacity: 0;
+          transition: opacity 0.3s ease;
+        }
+
+        /* Add text overlay - hidden by default */
+        .react-photo-album--row > div::after {
+          content: attr(data-title);
+          position: absolute;
+          bottom: 15px;
+          left: 15px;
+          right: 15px;
+          color: white;
+          font-size: 14px;
+          font-weight: 700;
+          text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+          line-height: 1.4;
+          z-index: 10;
+          pointer-events: none;
+          opacity: 0;
+          transition: opacity 0.3s ease;
+        }
+
+        /* Show overlay and text on hover */
+        .react-photo-album--row > div:hover::before,
+        .react-photo-album--row > div:hover::after {
+          opacity: 1;
+        }
+
+        /* Ensure the photo album container respects our custom styling */
+        .react-photo-album--row {
+          gap: 8px;
+        }
+      `}</style>
+
       <main className='main'>
         {/* Breadcrumb Section */}
         <section className='box-section box-breadcrumb background-body'>
@@ -260,9 +341,6 @@ export default function GalleryPage() {
                   <div className='gallery-content w-full'>
                     {/* Gallery Header */}
                     <div className='text-center mb-6 md:mb-8 px-4'>
-                      {/* <h2 className='text-2xl md:text-3xl lg:text-4xl font-bold text-gray-800 mb-3 md:mb-4'>
-                        {currentGallery.name}
-                      </h2> */}
                       {currentGallery.description && (
                         <p className='text-base md:text-lg text-gray-600 max-w-3xl mx-auto'>
                           {currentGallery.description}
@@ -274,8 +352,23 @@ export default function GalleryPage() {
                     {currentGallery.images &&
                     currentGallery.images.length > 0 ? (
                       <div className='gallery-grid-container w-full'>
-                        <ImageGallery
-                          imagesInfoArray={getImagesForGallery(currentGallery)}
+                        <RowsPhotoAlbum
+                          photos={getPhotosForGallery(currentGallery)}
+                          targetRowHeight={300}
+                          defaultContainerWidth={1200}
+                          sizes={{
+                            size: 'calc(100vw - 32px)',
+                            sizes: [
+                              {
+                                viewport: '(max-width: 1200px)',
+                                size: 'calc(100vw - 32px)',
+                              },
+                              {
+                                viewport: '(max-width: 768px)',
+                                size: 'calc(100vw - 16px)',
+                              },
+                            ],
+                          }}
                         />
                       </div>
                     ) : (
